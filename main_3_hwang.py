@@ -8,6 +8,11 @@ from PIL import Image, UnidentifiedImageError
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
+from langchain.document_loaders import CSVLoader
+from langchain.document_loaders import UnstructuredHTMLLoader
+from langchain.document_loaders import UnstructuredPowerPointLoader
+from langchain.document_loaders import YoutubeLoader
+from langchain.document_loaders import WikipediaLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -17,7 +22,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.callbacks import StreamlitCallbackHandler
-
 
 def initialize_session_state_variables():
     """
@@ -285,6 +289,12 @@ def get_vector_store(uploaded_file):
         loader = TextLoader(filepath)
     elif uploaded_file.name.lower().endswith(".docx"):
         loader = Docx2txtLoader(filepath)
+    elif uploaded_file.name.lower().endswith(".csv"):
+        loader = CSVLoader(filepath)
+    elif uploaded_file.name.lower().endswith(".html"):
+        loader = UnstructuredHTMLLoader(filepath)
+    elif uploaded_file.name.lower().endswith(".pptx"):
+        loader = UnstructuredPowerPointLoader(filepath)
     else:
         st.error("Please load a file in pdf or txt", icon="🚨")
         if os.path.exists(filepath):
@@ -570,7 +580,8 @@ def create_text(model):
         right.write("Temperature is set to 0.")
         uploaded_file = st.file_uploader(
             label="Upload an article",
-            type=["txt", "pdf", "docx"],
+            # UPDATE
+            type=["txt", "pdf", "docx", "csv", "pptx", "html"],
             accept_multiple_files=False,
             on_change=reset_conversation,
             label_visibility="collapsed",
