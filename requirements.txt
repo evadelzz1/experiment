@@ -3,6 +3,7 @@ openai
 langchain
 streamlit
 audio-recorder-streamlit
+gTTS
 pillow
 faiss-cpu
 tiktoken
