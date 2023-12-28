@@ -8,6 +8,11 @@ from PIL import Image, UnidentifiedImageError
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
+from langchain.document_loaders import CSVLoader
+from langchain.document_loaders import UnstructuredHTMLLoader
+from langchain.document_loaders import UnstructuredPowerPointLoader
+from langchain.document_loaders import YoutubeLoader
+from langchain.document_loaders import WikipediaLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -17,11 +22,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.callbacks import StreamlitCallbackHandler
-# UPDATE
-from langchain.document_loaders.csv_loader import CSVLoader
-from langchain.document_loaders import UnstructuredHTMLLoader
-from langchain.document_loaders import UnstructuredPowerPointLoader
-
 
 def initialize_session_state_variables():
     """
