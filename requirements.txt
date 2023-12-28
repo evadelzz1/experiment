@@ -1,9 +1,13 @@
+python_dotenv
 openai
+langchain
 streamlit
 audio-recorder-streamlit
 pillow
-langchain
-pypdf
-docx2txt
 faiss-cpu
 tiktoken
+pypdf
+docx2txt
+unstructured
+python-pptx
+wikipedia
