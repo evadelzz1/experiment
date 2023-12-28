@@ -16,7 +16,8 @@ from langchain.schema import SystemMessage, HumanMessage  # AIMessage
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from langchain.callbacks import StreamlitCallbackHandler
+from langchain.callbacks import StreamlitCallbackHandler 
+from gtts import gTTS
 
 
 def initialize_session_state_variables():
@@ -392,11 +393,8 @@ def perform_tts(text):
 
     try:
         with st.spinner("TTS in progress..."):
-            audio_response = st.session_state.openai.audio.speech.create(
-                model="tts-1",
-                voice="fable",
-                input=text,
-            )
+            audio_response = gTTS( text = text , lang='en')
+            
     except Exception as e:
         audio_response = None
         st.error(f"An error occurred: {e}", icon="🚨")
