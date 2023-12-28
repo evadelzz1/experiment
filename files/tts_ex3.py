@@ -17,6 +17,7 @@
 #   
 # - https://ai-creator.tistory.com/78
 # - https://stackoverflow.com/questions/74651215/couldnt-find-ffmpeg-or-avconv-python
+# - https://github.com/jiaaro/pydub/issues/348
 
 # pip install pydub
 # pip install ffmpeg
