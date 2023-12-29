@@ -12,3 +12,5 @@ docx2txt
 unstructured
 python-pptx
 wikipedia
+pydub
+ffmpeg
