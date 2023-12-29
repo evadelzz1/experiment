@@ -639,56 +639,14 @@ def create_text(model):
         document = loader.load()
 
         try:
-            if uploaded_file.name.lower().endswith('.pdf'):
-                with st.spinner("Summarizing..."):
-                    llm = ChatOpenAI(
-                        openai_api_key=st.session_state.openai_api_key, 
-                        temperature=0, 
-                        model_name="gpt-3.5-turbo-1106"
-                    )
-                    chain = load_summarize_chain(llm, chain_type="stuff")
-                    st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-            
-            if uploaded_file.name.lower().endswith('.txt'):
-                with st.spinner("Summarizing..."):
-                    llm = ChatOpenAI(
-                        openai_api_key=st.session_state.openai_api_key, 
-                        temperature=0, 
-                        model_name="gpt-3.5-turbo-1106"
-                    )
-                    chain = load_summarize_chain(llm, chain_type="stuff")
-                    st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-            
-            if uploaded_file.name.lower().endswith('.docx'):
-                with st.spinner("Summarizing..."):
-                    llm = ChatOpenAI(
-                        openai_api_key=st.session_state.openai_api_key, 
-                        temperature=0, 
-                        model_name="gpt-3.5-turbo-1106"
-                    )
-                    chain = load_summarize_chain(llm, chain_type="stuff")
-                    st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-            
-            if uploaded_file.name.lower().endswith('.pptx'):
-                with st.spinner("Summarizing..."):
-                    llm = ChatOpenAI(
-                        openai_api_key=st.session_state.openai_api_key, 
-                        temperature=0, 
-                        model_name="gpt-3.5-turbo-1106"
-                    )
-                    chain = load_summarize_chain(llm, chain_type="stuff")
-                    st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-
-            
-            if uploaded_file.name.lower().endswith('.html'):
-                with st.spinner("Summarizing..."):
-                    llm = ChatOpenAI(
-                        openai_api_key=st.session_state.openai_api_key, 
-                        temperature=0, 
-                        model_name="gpt-4-1106-preview"
-                    )
-                    chain = load_summarize_chain(llm, chain_type="map_reduce")
-                    st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
+            with st.spinner("Summarizing..."):
+                llm = ChatOpenAI(
+                    openai_api_key=st.session_state.openai_api_key, 
+                    temperature=0, 
+                    model_name="gpt-3.5-turbo-1106"
+                )
+                chain = load_summarize_chain(llm, chain_type="map_reduce")
+                st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
             
         except Exception as e:
             vector_store = None
