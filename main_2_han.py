@@ -68,6 +68,9 @@ def initialize_session_state_variables():
     if "audio_response" not in st.session_state:
         st.session_state.audio_response = None
 
+    if "audio_response_gtts" not in st.session_state:
+        st.session_state.audio_response_gtts = None
+        
     if "image_url" not in st.session_state:
         st.session_state.image_url = None
 
@@ -406,7 +409,7 @@ def perform_tts(text):
         with st.spinner("TTS in progress..."):
             audio_response = st.session_state.openai.audio.speech.create(
                 model="tts-1",
-                voice="fable",
+                voice=st.session_state.tts_voice,
                 input=text,
             )
     except Exception as e:
@@ -434,9 +437,8 @@ def play_audio(audio_response):
     This function takes an audio response (a bytes-like object)
     from TTS as input, and plays the audio.
     """
-    if st.session_state.tts_model == "Openai":
-           
-       
+
+    if st.session_state.tts_model == "OpenAI":
         audio_data = audio_response.read()
 
         # Encode audio data to base64
@@ -451,11 +453,10 @@ def play_audio(audio_response):
          """
          # Use Streamlit to render the audio player
         st.markdown(md, unsafe_allow_html=True)
-        
-    if st.session_state.tts == "gtts":
-            st.audio(audio_response)
+    elif st.session_state.tts == "gTTS":
+        st.audio(audio_response)
+            
 
-    
 def image_to_base64(image):
     """
     This function converts an image object from PIL to a base64
@@ -520,6 +521,7 @@ def reset_conversation():
     st.session_state.ai_resp = []
     st.session_state.temperature[1] = st.session_state.temperature[0]
     st.session_state.audio_response = None
+    st.session_state.audio_response_gtts = None
     st.session_state.vector_store = None
     st.session_state.sources = None
     st.session_state.memory = None
@@ -557,6 +559,7 @@ def create_text(model):
     roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer)
 
     with st.sidebar:
+        # Text to Speech selection
         st.write("")
         st.write("**Text to Speech**")
         st.session_state.tts = st.radio(
@@ -566,15 +569,28 @@ def create_text(model):
             index=1,
             label_visibility="collapsed",
         )
-        #TTS model selection
+        # TTS model selection
         st.write("")
-        st.write("**Choose the TTS model**")
+        st.write("**TTS model**")
         st.session_state.tts_model = st.radio(
             label="$\\hspace{0.08em}\\texttt{MODEL}$",
-            options=("Openai", "gtts"),
+            options=("OpenAI", "gTTS"),
+            horizontal=True,
             index=1,
             label_visibility="collapsed",
         )
+        # TTS voice selection
+        if st.session_state.tts_model == "OpenAI":
+            st.write("")
+            st.write("**TTS Voice**")
+            st.session_state.tts_voice = st.radio(
+                label="$\\hspace{0.08em}\\texttt{MODEL}$",
+                options=("alloy", "echo","fable","onyx","nova","shimmer"),
+                horizontal=True,
+                index=1,
+                label_visibility="collapsed",
+            )
+        # Temperature selection
         st.write("")
         st.write("**Temperature**")
         st.session_state.temperature[0] = st.slider(
@@ -644,13 +660,16 @@ def create_text(model):
                 )
 
     # Play TTS
-    if st.session_state.tts_model == "Openai":
-        if st.session_state.audio_response is not None:
-            play_audio(st.session_state.audio_response)
-            st.session_state.audio_response = None
+    if st.session_state.audio_response is not None: # tts_model == "OpenAI"
+        play_audio(st.session_state.audio_response)
+        st.session_state.audio_response = None
 
-    
-   
+    elif st.session_state.audio_response_gtts is not None: # tts_model == "gTTS"
+        st.audio(st.session_state.audio_response_gtts)
+        # audio_tag = f'<audio autoplay="true" src="data:audio/wav;base64,{st.session_state.audio_response_gtts}">'
+        # st.markdown(audio_tag, unsafe_allow_html=True)
+        st.session_state.audio_response_gtts = None
+
     # Reset the conversation
     st.button(label="Reset the conversation", on_click=reset_conversation)
 
@@ -698,23 +717,27 @@ def create_text(model):
             # TTS under two conditions
             cond1 = st.session_state.tts == "Enabled"
             cond2 = st.session_state.tts == "Auto" and st.session_state.mic_used
-            if cond1 or cond2:
-                if st.session_state.tts_model == "Openai":
-                    st.session_state.audio_response = perform_tts(generated_text)
-                if st.session_state.tts_model == "gtts":
-                    audio_response = perform_tts2(generated_text)
-                    st.audio(audio_response)
-                    
 
+            if cond1 or cond2:
+                if st.session_state.tts_model == "OpenAI":
+                    st.session_state.audio_response = perform_tts(generated_text)
+                elif st.session_state.tts_model == "gTTS":
+                    # st.session_state.audio_response = perform_tts2(generated_text)
+                    # st.audio(perform_tts2(generated_text))
+                    st.session_state.audio_response_gtts = perform_tts2(generated_text)
+                    # audio_response = perform_tts2(generated_text)
+                    # st.audio(audio_response)
+                    
+                              
             st.session_state.mic_used = False
             st.session_state.human_enq.append(user_prompt)
             st.session_state.ai_resp.append(generated_text)
 
         st.session_state.prompt_exists = False
-    #  아래 조건문이 포함되면, 음성 파일 실행 전에 사라집니다.!
-    #   if generated_text is not None:
-    #      st.rerun()
 
+        if generated_text is not None:
+           st.rerun()
+            
 
 def create_text_with_image(model):
     """
