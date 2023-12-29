@@ -4,7 +4,9 @@ import os, base64, requests, re
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from audio_recorder_streamlit import audio_recorder
+from gtts import gTTS
 from PIL import Image, UnidentifiedImageError
+
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
@@ -23,6 +25,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.callbacks import StreamlitCallbackHandler
 from langchain.chains.summarize import load_summarize_chain
+from langchain.prompts import PromptTemplate
 
 def initialize_session_state_variables():
     """
@@ -267,6 +270,47 @@ def openai_query_uploaded_image(image_b64, query, model="gpt-4-vision-preview"):
     return generated_text
 
 
+
+def summarize_document(docs, model="gpt-3.5-turbo"):
+
+    map_prompt_template = """
+        Write a summary of this chunk of text that includes the main points and any important details.
+        {text}
+        """
+
+    map_prompt = PromptTemplate(template=map_prompt_template, input_variables=["text"])
+
+    combine_prompt_template = """
+        Write a concise summary of the following text delimited by triple backquotes.
+        Return your response in bullet points which covers the key points of the text.
+        ```{text}```
+        BULLET POINT SUMMARY:
+        """
+
+    combine_prompt = PromptTemplate(
+        template=combine_prompt_template, input_variables=["text"]
+    )
+
+    openai_llm = ChatOpenAI(
+        openai_api_key=st.session_state.openai_api_key,
+        temperature=0,
+        model_name=model,
+        streaming=True
+    )
+    summary_chain = load_summarize_chain(
+        llm=openai_llm,
+        # retriever=vector_store.as_retriever(),
+        chain_type="map_reduce",
+        map_prompt=map_prompt,
+        combine_prompt=combine_prompt,
+        return_intermediate_steps=False,
+        verbose=True,
+    )
+    output = summary_chain.run(docs)
+    print(output)
+    
+    return output
+    
 def get_vector_store(uploaded_file):
     """
     This function takes an UploadedFile object as input,
@@ -319,6 +363,9 @@ def get_vector_store(uploaded_file):
                 openai_api_key=st.session_state.openai_api_key
             )
             vector_store = FAISS.from_documents(doc, embeddings)
+            
+            st.write(summarize_document(doc))
+            
     except Exception as e:
         vector_store = None
         st.error(f"An error occurred: {e}", icon="🚨")
@@ -408,6 +455,22 @@ def perform_tts(text):
                 voice="fable",
                 input=text,
             )
+    except Exception as e:
+        audio_response = None
+        st.error(f"An error occurred: {e}", icon="🚨")
+
+    return audio_response
+
+
+def perform_tts2(text):
+    try:
+        with st.spinner("TTS in progress..."):
+            tts = gTTS(text=text, lang='en', tld='com', slow=False)
+            print(1)
+            audio_response = BytesIO()      # convert to file-like object
+            print(2)
+            tts.write_to_fp(audio_response)
+            print(3)
     except Exception as e:
         audio_response = None
         st.error(f"An error occurred: {e}", icon="🚨")
@@ -560,7 +623,7 @@ def create_text(model):
             format="%.1f",
             label_visibility="collapsed",
         )
-        st.write("(Higher $\Rightarrow$ More random)")
+        st.write("(Default=0.7, Higher $\Rightarrow$ More random)")
 
     st.write("")
     st.write("##### Message to AI")
@@ -574,76 +637,15 @@ def create_text(model):
 
     if st.session_state.ai_role[0] != st.session_state.ai_role[1]:
         reset_conversation()
-        
-    if st.session_state.ai_role[0] == doc_summarizer:
-        st.write("")
-        left, right = st.columns([4, 7])
-        left.write("##### Document to summarize")
-        right.write("Temperature is set to 0.")
-        uploaded_file = st.file_uploader(
-            label="Upload a document",
-            type=["txt", "pdf", "docx", "pptx", "html"],
-            accept_multiple_files=False,
-            on_change=reset_conversation,
-            label_visibility="collapsed",
-        )
-        
-        if uploaded_file is None:
-            return None
-
-        file_bytes = BytesIO(uploaded_file.read())
-        
-        # Create a temporary file within the "files/" directory
-        with NamedTemporaryFile(dir="files/", delete=False) as file:
-            filepath = file.name
-            file.write(file_bytes.read())
-
-        # Determine the loader based on the file extension.
-        if uploaded_file.name.lower().endswith(".pdf"):
-            loader = PyPDFLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".txt"):
-            loader = TextLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".docx"):
-            loader = Docx2txtLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".csv"):
-            loader = CSVLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".html"):
-            loader = UnstructuredHTMLLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".pptx"):
-            loader = UnstructuredPowerPointLoader(filepath)
-        else:
-            st.error("Please load a file in pdf or txt", icon="🚨")
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            return None
-        
-        # Load the document using the selected loader.
-        document = loader.load()
-
-        try:
-            with st.spinner("Summarizing..."):
-                llm = ChatOpenAI(
-                    openai_api_key=st.session_state.openai_api_key, 
-                    temperature=0, 
-                    model_name="gpt-3.5-turbo-1106"
-                )
-                chain = load_summarize_chain(llm, chain_type="map_reduce")
-                st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-            
-        except Exception as e:
-            vector_store = None
-            st.error(f"An error occurred: {e}", icon="🚨")
-            
-            
 
     if st.session_state.ai_role[0] == doc_analyzer:
         st.write("")
         left, right = st.columns([4, 7])
         left.write("##### Document to ask about")
-        right.write("Temperature is set to 0.")
+        right.write("If you want a consistent answer, set the Temperature param to 0.")
         uploaded_file = st.file_uploader(
             label="Upload an article",
-            type=["txt", "pdf", "docx", "csv", "pptx", "html"],
+            type=["txt", "pdf", "docx", "pptx", "csv", "html"],
             accept_multiple_files=False,
             on_change=reset_conversation,
             label_visibility="collapsed",
@@ -732,6 +734,7 @@ def create_text(model):
             cond2 = st.session_state.tts == "Auto" and st.session_state.mic_used
             if cond1 or cond2:
                 st.session_state.audio_response = perform_tts(generated_text)
+                # st.session_state.audio_response = perform_tts2(generated_text)
 
             st.session_state.mic_used = False
             st.session_state.human_enq.append(user_prompt)
@@ -898,14 +901,13 @@ def create_image(model):
         if st.session_state.image_url is not None:
             st.rerun()
 
-
 def create_text_image():
     """
     This main function generates text or image by calling
     openai_create_text() or openai_create_image(), respectively.
     """
 
-    st.write("## 🎭 ChatGPT (RAG)$\,$ &$\,$ DALL·E")
+    st.write("## ChatGPT (RAG)$\,$ &$\,$ DALL·E")
 
     # Initialize all the session state variables
     initialize_session_state_variables()
@@ -983,12 +985,9 @@ def create_text_image():
     with st.sidebar:
         st.write("---")
         st.write(
-            "<small>**T.-W. Yoon**, Aug. 2023  \n</small>",
-            "<small>[TWY's Playground](https://twy-playground.streamlit.app/)  \n</small>",
-            "<small>[Differential equations](https://diff-eqn.streamlit.app/)</small>",
+            "<small>**blueholelabs**, Dec. 2023  \n</small>",
             unsafe_allow_html=True,
         )
-
 
 if __name__ == "__main__":
     create_text_image()
