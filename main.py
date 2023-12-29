@@ -409,7 +409,7 @@ def perform_tts(text):
         with st.spinner("TTS in progress..."):
             audio_response = st.session_state.openai.audio.speech.create(
                 model="tts-1",
-                voice="fable",
+                voice=st.session_state.tts_voice,
                 input=text,
             )
     except Exception as e:
@@ -578,6 +578,17 @@ def create_text(model):
             horizontal=True,
             index=1,
             label_visibility="collapsed",
+        )
+        # TTS voice selection
+        if st.session_state.tts_model == "OpenAI":
+            st.write("")
+            st.write("**TTS Voice**")
+            st.session_state.tts_voice = st.radio(
+                label="$\\hspace{0.08em}\\texttt{MODEL}$",
+                options=("alloy", "echo","fable","onyx","nova","shimmer"),
+                horizontal=True,
+                index=1,
+                label_visibility="collapsed",
         )
         # Temperature selection
         st.write("")
