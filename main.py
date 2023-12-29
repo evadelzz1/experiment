@@ -553,7 +553,8 @@ def create_text(model):
     translator = "You are a translator who translates English into Korean and Korean into English."
     coding_adviser = "You are an expert in coding who provides advice on good coding styles."
     doc_analyzer = "You are an assistant analyzing the document uploaded."
-    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer)
+    doc_summarizer = "You are an assistant summarizing the document uploaded."
+    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer, doc_summarizer)
 
     with st.sidebar:
         st.write("")
