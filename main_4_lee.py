@@ -535,7 +535,8 @@ def create_text(model):
     translator = "You are a translator who translates English into Korean and Korean into English."
     coding_adviser = "You are an expert in coding who provides advice on good coding styles."
     doc_analyzer = "You are an assistant analyzing the document uploaded."
-    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer)
+    doc_summarizer = "You are an assistant summarizing the document uploaded."
+    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer, doc_summarizer)
 
     with st.sidebar:
         st.write("")
@@ -572,6 +573,63 @@ def create_text(model):
 
     if st.session_state.ai_role[0] != st.session_state.ai_role[1]:
         reset_conversation()
+        
+    if st.session_state.ai_role[0] == doc_summarizer:
+        st.write("")
+        left, right = st.columns([4, 7])
+        left.write("##### Document to summarize")
+        right.write("Temperature is set to 0.")
+        uploaded_file = st.file_uploader(
+            label="Upload a document",
+            type=["txt", "pdf", "docx", "csv", "pptx", "html"],
+            accept_multiple_files=False,
+            on_change=reset_conversation,
+            label_visibility="collapsed",
+        )
+        
+        summary = ""
+        
+        # if type(uploaded_file) == "csv":
+        #     summary += "Cannot interpret."
+            
+        # with get_openai_callback() as cb:
+        #     chain = load_summarize_chain(
+        #         llm, 
+        #         chain_type="stuff", 
+        #         verbose=True
+        #     )
+
+        #     tx = chain.run(texts[:2])
+        #     print(tx)            
+        
+        
+        # try:
+        #     with st.spinner("Vector store in preparation..."):
+        #         # Split the loaded text into smaller chunks for processing.
+        #         text_splitter = RecursiveCharacterTextSplitter(
+        #             chunk_size=1000,
+        #             chunk_overlap=200,
+        #             # separators=["\n", "\n\n", "(?<=\. )", "", " "],
+        #         )
+        #         doc = text_splitter.split_documents(document)
+        #         # Create a FAISS vector database.
+        #         embeddings = OpenAIEmbeddings(
+        #             openai_api_key=st.session_state.openai_api_key
+        #         )
+        #         vector_store = FAISS.from_documents(doc, embeddings)
+        # except Exception as e:
+        #     vector_store = None
+        #     st.error(f"An error occurred: {e}", icon="🚨")        
+        
+        
+        if st.session_state.vector_store is None:
+            # Create the vector store.
+            st.session_state.vector_store = get_vector_store(uploaded_file)
+
+            # Print out the summary
+            if st.session_state.vector_store is not None:
+                st.write(f"Below is the summary of :blue[[{uploaded_file.name}]]. ")
+                st.write(summary)
 
     if st.session_state.ai_role[0] == doc_analyzer:
         st.write("")
@@ -580,7 +638,6 @@ def create_text(model):
         right.write("Temperature is set to 0.")
         uploaded_file = st.file_uploader(
             label="Upload an article",
-            # UPDATE
             type=["txt", "pdf", "docx", "csv", "pptx", "html"],
             accept_multiple_files=False,
             on_change=reset_conversation,
