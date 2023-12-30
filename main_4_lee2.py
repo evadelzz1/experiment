@@ -310,6 +310,9 @@ def summarize_document(docs, model="gpt-3.5-turbo"):
     print(output)
     
     return output
+
+
+
     
 def get_vector_store(uploaded_file):
     """
@@ -375,8 +378,6 @@ def get_vector_store(uploaded_file):
             
             if summary_option == "Enabled":
                 st.write(summarize_document(doc))
-            elif summary_option == "Disabled":
-                pass
             
     except Exception as e:
         vector_store = None

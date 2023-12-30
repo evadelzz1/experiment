@@ -24,7 +24,6 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.callbacks import StreamlitCallbackHandler
-from langchain.chains.summarize import load_summarize_chain
 
 def initialize_session_state_variables():
     """
@@ -69,6 +68,9 @@ def initialize_session_state_variables():
     if "audio_response" not in st.session_state:
         st.session_state.audio_response = None
 
+    if "audio_response_gtts" not in st.session_state:
+        st.session_state.audio_response_gtts = None
+        
     if "image_url" not in st.session_state:
         st.session_state.image_url = None
 
@@ -407,7 +409,7 @@ def perform_tts(text):
         with st.spinner("TTS in progress..."):
             audio_response = st.session_state.openai.audio.speech.create(
                 model="tts-1",
-                voice="fable",
+                voice=st.session_state.tts_voice,
                 input=text,
             )
     except Exception as e:
@@ -421,11 +423,8 @@ def perform_tts2(text):
     try:
         with st.spinner("TTS in progress..."):
             tts = gTTS(text=text, lang='en', tld='com', slow=False)
-            print(1)
             audio_response = BytesIO()      # convert to file-like object
-            print(2)
             tts.write_to_fp(audio_response)
-            print(3)
     except Exception as e:
         audio_response = None
         st.error(f"An error occurred: {e}", icon="🚨")
@@ -439,22 +438,24 @@ def play_audio(audio_response):
     from TTS as input, and plays the audio.
     """
 
-    audio_data = audio_response.read()
+    if st.session_state.tts_model == "OpenAI":
+        audio_data = audio_response.read()
 
-    # Encode audio data to base64
-    b64 = base64.b64encode(audio_data).decode("utf-8")
+        # Encode audio data to base64
+        b64 = base64.b64encode(audio_data).decode("utf-8")
 
-    # Create a markdown string to embed the audio player with the base64 source
-    md = f"""
-        <audio controls autoplay style="width: 100%;">
-        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        Your browser does not support the audio element.
-        </audio>
-        """
-
-    # Use Streamlit to render the audio player
-    st.markdown(md, unsafe_allow_html=True)
-
+        # Create a markdown string to embed the audio player with the base64 source
+        md = f"""
+         <audio controls autoplay style="width: 100%;">
+         <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+         Your browser does not support the audio element.
+            </audio>
+         """
+         # Use Streamlit to render the audio player
+        st.markdown(md, unsafe_allow_html=True)
+    elif st.session_state.tts == "gTTS":
+        st.audio(audio_response)
+            
 
 def image_to_base64(image):
     """
@@ -520,6 +521,7 @@ def reset_conversation():
     st.session_state.ai_resp = []
     st.session_state.temperature[1] = st.session_state.temperature[0]
     st.session_state.audio_response = None
+    st.session_state.audio_response_gtts = None
     st.session_state.vector_store = None
     st.session_state.sources = None
     st.session_state.memory = None
@@ -554,10 +556,10 @@ def create_text(model):
     translator = "You are a translator who translates English into Korean and Korean into English."
     coding_adviser = "You are an expert in coding who provides advice on good coding styles."
     doc_analyzer = "You are an assistant analyzing the document uploaded."
-    doc_summarizer = "You are an assistant summarizing the document uploaded."
-    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer, doc_summarizer)
+    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer)
 
     with st.sidebar:
+        # Text to Speech selection
         st.write("")
         st.write("**Text to Speech**")
         st.session_state.tts = st.radio(
@@ -567,6 +569,28 @@ def create_text(model):
             index=1,
             label_visibility="collapsed",
         )
+        # TTS model selection
+        st.write("")
+        st.write("**TTS model**")
+        st.session_state.tts_model = st.radio(
+            label="$\\hspace{0.08em}\\texttt{MODEL}$",
+            options=("OpenAI", "gTTS"),
+            horizontal=True,
+            index=1,
+            label_visibility="collapsed",
+        )
+        # TTS voice selection
+        if st.session_state.tts_model == "OpenAI":
+            st.write("")
+            st.write("**TTS Voice**")
+            st.session_state.tts_voice = st.radio(
+                label="$\\hspace{0.08em}\\texttt{MODEL}$",
+                options=("alloy", "echo","fable","onyx","nova","shimmer"),
+                horizontal=True,
+                index=1,
+                label_visibility="collapsed",
+        )
+        # Temperature selection
         st.write("")
         st.write("**Temperature**")
         st.session_state.temperature[0] = st.slider(
@@ -592,65 +616,6 @@ def create_text(model):
 
     if st.session_state.ai_role[0] != st.session_state.ai_role[1]:
         reset_conversation()
-        
-    if st.session_state.ai_role[0] == doc_summarizer:
-        st.write("")
-        left, right = st.columns([4, 7])
-        left.write("##### Document to summarize")
-        right.write("Temperature is set to 0.")
-        uploaded_file = st.file_uploader(
-            label="Upload a document",
-            type=["txt", "pdf", "docx", "pptx", "html"],
-            accept_multiple_files=False,
-            on_change=reset_conversation,
-            label_visibility="collapsed",
-        )
-        
-        if uploaded_file is None:
-            return None
-
-        file_bytes = BytesIO(uploaded_file.read())
-        
-        # Create a temporary file within the "files/" directory
-        with NamedTemporaryFile(dir="files/", delete=False) as file:
-            filepath = file.name
-            file.write(file_bytes.read())
-
-        # Determine the loader based on the file extension.
-        if uploaded_file.name.lower().endswith(".pdf"):
-            loader = PyPDFLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".txt"):
-            loader = TextLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".docx"):
-            loader = Docx2txtLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".csv"):
-            loader = CSVLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".html"):
-            loader = UnstructuredHTMLLoader(filepath)
-        elif uploaded_file.name.lower().endswith(".pptx"):
-            loader = UnstructuredPowerPointLoader(filepath)
-        else:
-            st.error("Please load a file in pdf or txt", icon="🚨")
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            return None
-        
-        # Load the document using the selected loader.
-        document = loader.load()
-
-        try:
-            with st.spinner("Summarizing..."):
-                llm = ChatOpenAI(
-                    openai_api_key=st.session_state.openai_api_key, 
-                    temperature=0, 
-                    model_name="gpt-3.5-turbo-1106"
-                )
-                chain = load_summarize_chain(llm, chain_type="map_reduce")
-                st.write(f"Summary of :blue[[{uploaded_file.name}]]: " + chain.run(document))
-            
-        except Exception as e:
-            vector_store = None
-            st.error(f"An error occurred: {e}", icon="🚨")
 
     if st.session_state.ai_role[0] == doc_analyzer:
         st.write("")
@@ -695,9 +660,15 @@ def create_text(model):
                 )
 
     # Play TTS
-    if st.session_state.audio_response is not None:
+    if st.session_state.audio_response is not None: # tts_model == "OpenAI"
         play_audio(st.session_state.audio_response)
         st.session_state.audio_response = None
+
+    elif st.session_state.audio_response_gtts is not None: # tts_model == "gTTS"
+        st.audio(st.session_state.audio_response_gtts)
+        # audio_tag = f'<audio autoplay="true" src="data:audio/wav;base64,{st.session_state.audio_response_gtts}">'
+        # st.markdown(audio_tag, unsafe_allow_html=True)
+        st.session_state.audio_response_gtts = None
 
     # Reset the conversation
     st.button(label="Reset the conversation", on_click=reset_conversation)
@@ -746,10 +717,18 @@ def create_text(model):
             # TTS under two conditions
             cond1 = st.session_state.tts == "Enabled"
             cond2 = st.session_state.tts == "Auto" and st.session_state.mic_used
-            if cond1 or cond2:
-                st.session_state.audio_response = perform_tts(generated_text)
-                # st.session_state.audio_response = perform_tts2(generated_text)
 
+            if cond1 or cond2:
+                if st.session_state.tts_model == "OpenAI":
+                    st.session_state.audio_response = perform_tts(generated_text)
+                elif st.session_state.tts_model == "gTTS":
+                    # st.session_state.audio_response = perform_tts2(generated_text)
+                    # st.audio(perform_tts2(generated_text))
+                    st.session_state.audio_response_gtts = perform_tts2(generated_text)
+                    # audio_response = perform_tts2(generated_text)
+                    # st.audio(audio_response)
+                    
+                              
             st.session_state.mic_used = False
             st.session_state.human_enq.append(user_prompt)
             st.session_state.ai_resp.append(generated_text)
@@ -757,8 +736,8 @@ def create_text(model):
         st.session_state.prompt_exists = False
 
         if generated_text is not None:
-            st.rerun()
-
+           st.rerun()
+            
 
 def create_text_with_image(model):
     """
