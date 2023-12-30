@@ -284,7 +284,7 @@ def summarize_document(docs, model="gpt-3.5-turbo"):
         Write a concise summary of the following text delimited by triple backquotes.
         Return your response in bullet points which covers the key points of the text.
         ```{text}```
-        BULLET POINT SUMMARY:
+        SUMMARY:
         """
 
     combine_prompt = PromptTemplate(
@@ -316,6 +316,15 @@ def get_vector_store(uploaded_file):
     This function takes an UploadedFile object as input,
     and returns a FAISS vector store.
     """
+    
+    with st.sidebar:
+        st.write("**Summarize Text**")
+        summary_option = st.radio(
+            label="Summarize Text",
+            options=("Enabled", "Disabled"),
+            label_visibility="collapsed",
+            index=1
+        )
 
     if uploaded_file is None:
         return None
@@ -364,7 +373,10 @@ def get_vector_store(uploaded_file):
             )
             vector_store = FAISS.from_documents(doc, embeddings)
             
-            st.write(summarize_document(doc))
+            if summary_option == "Enabled":
+                st.write(summarize_document(doc))
+            elif summary_option == "Disabled":
+                pass
             
     except Exception as e:
         vector_store = None
@@ -599,8 +611,7 @@ def create_text(model):
     translator = "You are a translator who translates English into Korean and Korean into English."
     coding_adviser = "You are an expert in coding who provides advice on good coding styles."
     doc_analyzer = "You are an assistant analyzing the document uploaded."
-    doc_summarizer = "You are an assistant summarizing the document uploaded."
-    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer, doc_summarizer)
+    roles = (general_role, english_teacher, translator, coding_adviser, doc_analyzer)
 
     with st.sidebar:
         st.write("")
@@ -650,6 +661,7 @@ def create_text(model):
             on_change=reset_conversation,
             label_visibility="collapsed",
         )
+            
         if st.session_state.vector_store is None:
             # Create the vector store.
             st.session_state.vector_store = get_vector_store(uploaded_file)
