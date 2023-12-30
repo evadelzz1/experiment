@@ -1,5 +1,6 @@
 import streamlit as st
 import openai
+import tiktoken
 import os, base64, requests, re
 from io import BytesIO
 from tempfile import NamedTemporaryFile
@@ -24,8 +25,12 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks import StreamlitCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain.chains.llm import LLMChain
+from langchain.chains.combine_documents.stuff import StuffDocumentsChain
 from langchain.chains.summarize import load_summarize_chain
 from langchain.prompts import PromptTemplate
+
+
 
 def initialize_session_state_variables():
     """
@@ -273,18 +278,17 @@ def openai_query_uploaded_image(image_b64, query, model="gpt-4-vision-preview"):
     return generated_text
 
 
-def summarize_document(docs, model="gpt-3.5-turbo"):
+def summarize_document_mr(docs, model="gpt-3.5-turbo"):
 
     map_prompt_template = """
-        Write a summary of this chunk of text that includes the main points and any important details.
+        Write a summary of this chunk of text that includes the main points and any keys details.
         {text}
         """
 
     map_prompt = PromptTemplate(template=map_prompt_template, input_variables=["text"])
 
     combine_prompt_template = """
-        Write a concise summary of the following text delimited by triple backquotes.
-        Return your response in bullet points which covers the key points of the text.
+        Write a concise summary with key information of the following text delimited by triple backquotes. 
         ```{text}```
         SUMMARY:
         """
@@ -309,10 +313,32 @@ def summarize_document(docs, model="gpt-3.5-turbo"):
         verbose=True,
     )
     output = summary_chain.run(docs)
-    print(output)
+    # print(output)
     
     return output
 
+def summarize_document_s(docs, model="gpt-3.5-turbo"):
+    
+    llm = ChatOpenAI(
+        openai_api_key=st.session_state.openai_api_key,
+        temperature=0, 
+        model_name=model,
+        streaming=True
+    )
+    chain = load_summarize_chain(llm, chain_type="stuff")
+    
+    prompt_template = """Write a concise summary of the following:
+    "{text}"
+    CONCISE SUMMARY:"""
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    llm_chain = LLMChain(llm=llm, prompt=prompt)
+    
+    stuff_chain = StuffDocumentsChain(llm_chain=llm_chain, document_variable_name="text")
+
+    output = stuff_chain.run(docs)
+    # print(output)
+    return output
 
 def get_vector_store(uploaded_file):
     """
@@ -370,13 +396,23 @@ def get_vector_store(uploaded_file):
                 # separators=["\n", "\n\n", "(?<=\. )", "", " "],
             )
             doc = text_splitter.split_documents(document)
+            
+            doc_count = 0
+            
+            for i in doc:
+                doc_count += len(str(i))
+            
             # Create a FAISS vector database.
             embeddings = OpenAIEmbeddings(
                 openai_api_key=st.session_state.openai_api_key
             )
             vector_store = FAISS.from_documents(doc, embeddings)
             if summary_option == "Enabled":
-                st.write(summarize_document(doc))
+                # if total_tokens < 4097:
+                if doc_count < 16388:
+                    st.write(summarize_document_s(doc))
+                else:
+                    st.write(summarize_document_mr(doc))
     except Exception as e:
         vector_store = None
         st.error(f"An error occurred: {e}", icon="🚨")
