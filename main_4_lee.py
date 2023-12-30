@@ -25,6 +25,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.callbacks import StreamlitCallbackHandler
 
+
 def initialize_session_state_variables():
     """
     This function initializes all the session state variables.
