@@ -21,10 +21,11 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage  # AIMessage
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.callbacks import StreamlitCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from langchain.callbacks import StreamlitCallbackHandler
-
+from langchain.chains.summarize import load_summarize_chain
+from langchain.prompts import PromptTemplate
 
 def initialize_session_state_variables():
     """
@@ -272,11 +273,61 @@ def openai_query_uploaded_image(image_b64, query, model="gpt-4-vision-preview"):
     return generated_text
 
 
+def summarize_document(docs, model="gpt-3.5-turbo"):
+
+    map_prompt_template = """
+        Write a summary of this chunk of text that includes the main points and any important details.
+        {text}
+        """
+
+    map_prompt = PromptTemplate(template=map_prompt_template, input_variables=["text"])
+
+    combine_prompt_template = """
+        Write a concise summary of the following text delimited by triple backquotes.
+        Return your response in bullet points which covers the key points of the text.
+        ```{text}```
+        SUMMARY:
+        """
+
+    combine_prompt = PromptTemplate(
+        template=combine_prompt_template, input_variables=["text"]
+    )
+
+    openai_llm = ChatOpenAI(
+        openai_api_key=st.session_state.openai_api_key,
+        temperature=0,
+        model_name=model,
+        streaming=True
+    )
+    summary_chain = load_summarize_chain(
+        llm=openai_llm,
+        # retriever=vector_store.as_retriever(),
+        chain_type="map_reduce",
+        map_prompt=map_prompt,
+        combine_prompt=combine_prompt,
+        return_intermediate_steps=False,
+        verbose=True,
+    )
+    output = summary_chain.run(docs)
+    print(output)
+    
+    return output
+
+
 def get_vector_store(uploaded_file):
     """
     This function takes an UploadedFile object as input,
     and returns a FAISS vector store.
     """
+    
+    with st.sidebar:
+        st.write("**Summarize Text**")
+        summary_option = st.radio(
+            label="Summarize Text",
+            options=("Enabled", "Disabled"),
+            label_visibility="collapsed",
+            index=1
+        )
 
     if uploaded_file is None:
         return None
@@ -324,6 +375,8 @@ def get_vector_store(uploaded_file):
                 openai_api_key=st.session_state.openai_api_key
             )
             vector_store = FAISS.from_documents(doc, embeddings)
+            if summary_option == "Enabled":
+                st.write(summarize_document(doc))
     except Exception as e:
         vector_store = None
         st.error(f"An error occurred: {e}", icon="🚨")
@@ -566,7 +619,7 @@ def create_text(model):
         st.session_state.tts = st.radio(
             label="$\\hspace{0.08em}\\texttt{TTS}$",
             options=("Enabled", "Disabled", "Auto"),
-            # horizontal=True,
+            horizontal=True,
             index=1,
             label_visibility="collapsed",
         )
