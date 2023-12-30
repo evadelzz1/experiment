@@ -21,9 +21,9 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage  # AIMessage
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.callbacks import StreamlitCallbackHandler
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from langchain.callbacks import StreamlitCallbackHandler
 from langchain.chains.summarize import load_summarize_chain
 from langchain.prompts import PromptTemplate
 
@@ -619,7 +619,7 @@ def create_text(model):
         st.session_state.tts = st.radio(
             label="$\\hspace{0.08em}\\texttt{TTS}$",
             options=("Enabled", "Disabled", "Auto"),
-            # horizontal=True,
+            horizontal=True,
             index=1,
             label_visibility="collapsed",
         )
